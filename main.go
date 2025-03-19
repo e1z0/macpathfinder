@@ -310,9 +310,33 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 	// Fetch Interface table
 	ifData, _ := snmp.BulkWalkAll(interfaceOIDs[vendor])
 
-    // Fetch VLAN Mode Table (Access/Trunk)
-    vlanModeOID := "1.3.6.1.4.1.9.9.68.1.2.2.1.2" // Cisco OID for Port VLAN Mode
-    vlanModeData, _ := snmp.BulkWalkAll(vlanModeOID)
+        // Fetch VLAN Mode Table (Access/Trunk)
+        accessPorts := make(map[string]bool)
+        vlanData, _ := snmp.BulkWalkAll(vlanOIDs[vendor])
+
+    if len(vlanData) > 0 {
+        for _, pd := range vlanData {
+            oidParts := strings.Split(pd.Name, ".")
+            ifIndex := oidParts[len(oidParts)-1]
+            accessPorts[ifIndex] = true
+        }
+    } else {
+        vlanMembershipOID := "1.3.6.1.2.1.17.7.1.4.3.1.2"
+        vlanData, _ = snmp.BulkWalkAll(vlanMembershipOID)
+        portVlanCount := make(map[string]int)
+
+        for _, pd := range vlanData {
+            oidParts := strings.Split(pd.Name, ".")
+            ifIndex := oidParts[len(oidParts)-1]
+            portVlanCount[ifIndex]++
+        }
+
+        for port, count := range portVlanCount {
+            if count == 1 {
+                accessPorts[port] = true
+            }
+        }
+    }
 
 
 	// Map ifIndex to Port Name
@@ -335,9 +359,12 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 		}
 	}
 
+/*
     // Map ifIndex to VLAN Mode (1 = Access, 2 = Trunk)
+fmt.Printf("DEBUG: %v\n",vlanModeData)
     accessPorts := make(map[string]bool)
-    for _, pd := range vlanModeData {
+      for _, pd := range vlanModeData {
+fmt.Printf("%s -> %s\n",pd.Name,pd.Value)
         oidParts := strings.Split(pd.Name, ".")
         ifIndex := oidParts[len(oidParts)-1]
 
@@ -345,6 +372,9 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
             accessPorts[ifIndex] = true
         }
     }
+*/
+
+
 
 	// Process MAC Addresses (Convert Decimal to Hex)
 	for _, pd := range macData {
@@ -366,17 +396,17 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 
 		ifIndex := fmt.Sprintf("%v", pd.Value) // Convert interface index to string
 		port, exists := ifIndexToPort[ifIndex]
-		fmt.Printf("%s -> %s\n", mac, port)
+		//fmt.Printf("%s -> %s\n", mac, port)
 		if !exists {
 			port = "Unknown Port"
 		}
 
         // ❌ Skip trunk ports, keep only access ports
         if _, isAccess := accessPorts[ifIndex]; !isAccess {
-            fmt.Printf("⏭️ Skipping trunk port: %s\n", port)
+            fmt.Printf("⏭️ S.......................................kipping trunk port: %s\n", port)
             continue
         }
-
+ fmt.Printf("⏭️ Sdding access port: %s\n", port)
 		results = append(results, map[string]string{
 			"mac":  mac,
 			"port": port,
