@@ -40,8 +40,8 @@ var interfaceOIDs = map[string]string{
 // Vendor-specific VLAN OIDs
 var vlanOIDs = map[string]string{
 	"Cisco":    "1.3.6.1.4.1.9.9.68.1.2.2.1.2",
-	"Aruba":    "1.3.6.1.2.1.17.7.1.4.5.1.1",
-	"ProCurve": "1.3.6.1.2.1.17.7.1.4.5.1.1",
+	"Aruba":    "1.3.6.1.2.1.17.7.1.4.3.1.1",
+	"ProCurve": "1.3.6.1.2.1.17.7.1.4.3.1.1",
 }
 
 func dbpath() (string, error) {
@@ -402,14 +402,18 @@ fmt.Printf("%s -> %s\n",pd.Name,pd.Value)
 		}
 
         // ❌ Skip trunk ports, keep only access ports
-        if _, isAccess := accessPorts[ifIndex]; !isAccess {
-            fmt.Printf("⏭️ S.......................................kipping trunk port: %s\n", port)
-            continue
+        access := "1"
+        _, isAccess := accessPorts[ifIndex]
+        if !isAccess {
+            access = "0"
+            fmt.Printf("⏭️ .................................Skipping port: %s\n", port)
+//            continue
         }
- fmt.Printf("⏭️ Sdding access port: %s\n", port)
+ fmt.Printf("⏭️ Adding access port: %s\n", port)
 		results = append(results, map[string]string{
 			"mac":  mac,
 			"port": port,
+                        "access": access,
 		})
 	}
 
@@ -428,6 +432,7 @@ func updateSQLite(hostname, ip, vendor string, data []map[string]string) error {
 		vendor TEXT,
 		mac_address TEXT,
 		port_name TEXT,
+                access TEXT,
 		created_at TEXT DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(switch_name, mac_address, port_name)
@@ -437,10 +442,10 @@ func updateSQLite(hostname, ip, vendor string, data []map[string]string) error {
                    return err
         }
 	for _, entry := range data {
-		_, err := db.Exec(`INSERT INTO network_inventory (switch_name, switch_ip, vendor, mac_address, port_name, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		_, err := db.Exec(`INSERT INTO network_inventory (switch_name, switch_ip, vendor, mac_address, port_name, access, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(switch_name, mac_address, port_name) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
-			hostname, ip, vendor, entry["mac"], entry["port"])
+			hostname, ip, vendor, entry["mac"], entry["port"], entry["access"])
                if err != nil {
                     fmt.Printf("SQL Error: %s\n",err)
                     return err
