@@ -315,12 +315,16 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
         // Fetch VLAN Mode Table (Access/Trunk)
         accessPorts := make(map[string]bool)
         vlanData, _ := snmp.BulkWalkAll(vlanOIDs[vendor])
+    pvidOID := "1.3.6.1.2.1.17.7.1.4.5.1.1"
+    pvidData, _ := snmp.BulkWalkAll(pvidOID)
+        vlanCount := make(map[string]int)
 
-    if len(vlanData) > 0 {
+/*    if len(vlanData) > 0 {
         for _, pd := range vlanData {
             oidParts := strings.Split(pd.Name, ".")
             ifIndex := oidParts[len(oidParts)-1]
             accessPorts[ifIndex] = true
+            vlanCount[ifIndex]++
         }
     } else {
         vlanMembershipOID := "1.3.6.1.2.1.17.7.1.4.3.1.2"
@@ -339,6 +343,24 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
             }
         }
     }
+*/
+   for _, pd := range vlanData {
+        oidParts := strings.Split(pd.Name, ".")
+        ifIndex := oidParts[len(oidParts)-1]
+        vlanCount[ifIndex]++
+    }
+
+    // Map PVID (Primary VLAN ID) to each port
+    for _, pd := range pvidData {
+        oidParts := strings.Split(pd.Name, ".")
+        ifIndex := oidParts[len(oidParts)-1]
+
+        // If a port has only 1 VLAN, it's an access port
+        if vlanCount[ifIndex] == 1 {
+            accessPorts[ifIndex] = true
+        }
+    }
+
 
 
 	// Map ifIndex to Port Name
