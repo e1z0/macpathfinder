@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+        "flag"
 )
 
 // Config struct to hold settings
@@ -50,6 +51,14 @@ func dbpath() (string, error) {
 	}
 	dbpath := filepath.Join(filepath.Dir(exePath), config.Database)
 	return dbpath, nil
+}
+
+func apppath() string {
+        exePath, err := os.Executable()
+        if err != nil {
+                return ""
+        }
+        return filepath.Dir(exePath)
 }
 
 // GetVendor returns the vendor name based on the template ID
@@ -91,6 +100,19 @@ func LoadSettings() error {
 		Vendors:     vendorMap,
 	}
 	return nil
+}
+
+// Append to file
+func AppendFile(filename, text string) error {
+        f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+        if err != nil {
+               return err
+        }
+        defer f.Close()
+        if _, err = f.WriteString(text); err != nil {
+               return err
+        }
+        return nil
 }
 
 // Zabbix API Request Structs
@@ -349,12 +371,12 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 }
 
 // 📌 4️⃣ Store in SQLite
-func updateSQLite(hostname, ip, vendor string, data []map[string]string) {
+func updateSQLite(hostname, ip, vendor string, data []map[string]string) error {
 	dbp, _ := dbpath()
 	db, _ := sql.Open("sqlite3", dbp)
 	defer db.Close()
 
-	db.Exec(`CREATE TABLE IF NOT EXISTS network_inventory (
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS network_inventory (
 		switch_name TEXT,
 		switch_ip TEXT,
 		vendor TEXT,
@@ -364,13 +386,21 @@ func updateSQLite(hostname, ip, vendor string, data []map[string]string) {
 		updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(switch_name, mac_address, port_name)
 	)`)
-
+        if err != nil {
+                   fmt.Printf("Unable to create database schema: %s\n",err)
+                   return err
+        }
 	for _, entry := range data {
-		db.Exec(`INSERT INTO network_inventory (switch_name, switch_ip, vendor, mac_address, port_name, updated_at)
+		_, err := db.Exec(`INSERT INTO network_inventory (switch_name, switch_ip, vendor, mac_address, port_name, updated_at)
 		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(switch_name, mac_address, port_name) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
 			hostname, ip, vendor, entry["mac"], entry["port"])
+               if err != nil {
+                    fmt.Printf("SQL Error: %s\n",err)
+                    return err
+               }
 	}
+        return nil
 }
 
 func main() {
@@ -379,18 +409,29 @@ func main() {
 		fmt.Printf("%s\n", err)
 		os.Exit(1)
 	}
+        single := flag.Bool("single",false,"Process single server, specify --host to pass the hostname")
+        hst := flag.String("host","","Hostname")
+        flag.Parse()
+        faillog := filepath.Join(filepath.Dir(apppath()), "fail.log")
 	hosts, _ := getZabbixHosts()
 	for _, host := range hosts {
+                if *single && *hst != host["hostnmame"] {
+                       continue
+                }
 		if host["community"] == "" {
-			fmt.Printf("Host: %s community is empty, its either using not compliant snmp v1/v2 or there are another problems like invalid macros\n", host["hostname"])
+                        AppendFile(faillog,fmt.Sprintf("Host: %s community is empty, its either using not compliant snmp v1/v2 or there are another problems like invalid macros\n", host["hostname"]))
 			continue
 		}
 		if host["vendor"] == "Unknown" {
-			fmt.Printf("Host: %s vendor is unknown, cannot validate it, assign valid templates to the host\n", host["hostname"])
+                        AppendFile(faillog,fmt.Sprintf("Host: %s vendor is unknown, cannot validate it, assign valid templates to the host\n", host["hostname"]))
 			continue
 		}
 		fmt.Println("🔄 Querying:", host["hostname"])
 		data := getMACPortData(host["ip"], host["community"], host["vendor"])
-		updateSQLite(host["hostname"], host["ip"], host["vendor"], data)
+                if *single {
+                   fmt.Printf("Data: %s\n",data)
+                } else {
+		   updateSQLite(host["hostname"], host["ip"], host["vendor"], data)
+                }
 	}
 }
