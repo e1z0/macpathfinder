@@ -97,7 +97,7 @@
                                     <strong>IP:</strong> ${item.switch_ip} <br>
                                     <strong>Brand:</strong> ${item.vendor} <br>
                                     <strong>MAC Address:</strong> ${item.mac_address} <br>
-                                    <strong>Port:</strong> ${item.port_name} <br>
+                                    <strong>Port:</strong> ${item.port_name} <strong>Type:</strong> ${item.access_val} <br>
                                     <strong>Created At:</strong> ${item.created_at} <br>
                                     <strong>Updated At:</strong> ${item.updated_at}
                                 </div>

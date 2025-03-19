@@ -48,6 +48,8 @@ if (isset($_GET['mac']) && !empty($_GET['mac'])) {
         $res = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $result = [];
         foreach ($res as $item) {
+             $item["access_val"] = "Trunk port";
+             if ($item["access"] == "1") $item["access_val"] = "Access Port";
              // Check if 'name' in the item contains any of the patterns from $arr
              foreach ($skip as $pattern) {
                if (strpos($item['port_name'], $pattern) !== false) {
