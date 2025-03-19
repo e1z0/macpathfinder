@@ -310,14 +310,13 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 	// Fetch Interface table
 	ifData, _ := snmp.BulkWalkAll(interfaceOIDs[vendor])
 
+    // Fetch VLAN Mode Table (Access/Trunk)
+    vlanModeOID := "1.3.6.1.4.1.9.9.68.1.2.2.1.2" // Cisco OID for Port VLAN Mode
+    vlanModeData, _ := snmp.BulkWalkAll(vlanModeOID)
+
+
 	// Map ifIndex to Port Name
 	ifIndexToPort := make(map[string]string)
-	/*
-	   	for _, pd := range ifData {
-	   		ifIndexToPort[pd.Name] = strings.Trim(pd.Value.(string), `"`)
-
-	   }
-	*/
 	for _, pd := range ifData {
 		// Extract ifIndex (last number in OID)
 		oidParts := strings.Split(pd.Name, ".")
@@ -335,6 +334,17 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 			continue
 		}
 	}
+
+    // Map ifIndex to VLAN Mode (1 = Access, 2 = Trunk)
+    accessPorts := make(map[string]bool)
+    for _, pd := range vlanModeData {
+        oidParts := strings.Split(pd.Name, ".")
+        ifIndex := oidParts[len(oidParts)-1]
+
+        if v, ok := pd.Value.(int); ok && v == 1 { // 1 = Access mode
+            accessPorts[ifIndex] = true
+        }
+    }
 
 	// Process MAC Addresses (Convert Decimal to Hex)
 	for _, pd := range macData {
@@ -360,6 +370,12 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 		if !exists {
 			port = "Unknown Port"
 		}
+
+        // ❌ Skip trunk ports, keep only access ports
+        if _, isAccess := accessPorts[ifIndex]; !isAccess {
+            fmt.Printf("⏭️ Skipping trunk port: %s\n", port)
+            continue
+        }
 
 		results = append(results, map[string]string{
 			"mac":  mac,
