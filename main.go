@@ -416,11 +416,11 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
             if BIGDEBUG {
                  fmt.Printf("⏭️ .................................Skipping port: %s\n", port)
             }
-        }
+        } else {
          if BIGDEBUG {
                 fmt.Printf("⏭️ Adding access port: %s\n", port)
          }
-
+        }
 		results = append(results, map[string]string{
 			"mac":  mac,
 			"port": port,
