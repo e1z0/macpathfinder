@@ -17,6 +17,8 @@ import (
         "flag"
 )
 
+var BIGDEBUG bool = true
+
 // Config struct to hold settings
 type Config struct {
 	ZabbixToken string
@@ -359,23 +361,6 @@ func getMACPortData(ip, community, vendor string) []map[string]string {
 		}
 	}
 
-/*
-    // Map ifIndex to VLAN Mode (1 = Access, 2 = Trunk)
-fmt.Printf("DEBUG: %v\n",vlanModeData)
-    accessPorts := make(map[string]bool)
-      for _, pd := range vlanModeData {
-fmt.Printf("%s -> %s\n",pd.Name,pd.Value)
-        oidParts := strings.Split(pd.Name, ".")
-        ifIndex := oidParts[len(oidParts)-1]
-
-        if v, ok := pd.Value.(int); ok && v == 1 { // 1 = Access mode
-            accessPorts[ifIndex] = true
-        }
-    }
-*/
-
-
-
 	// Process MAC Addresses (Convert Decimal to Hex)
 	for _, pd := range macData {
 		oidParts := strings.Split(pd.Name, ".") // Extract OID elements
@@ -406,10 +391,14 @@ fmt.Printf("%s -> %s\n",pd.Name,pd.Value)
         _, isAccess := accessPorts[ifIndex]
         if !isAccess {
             access = "0"
-            fmt.Printf("⏭️ .................................Skipping port: %s\n", port)
-//            continue
+            if BIGDEBUG {
+                 fmt.Printf("⏭️ .................................Skipping port: %s\n", port)
+            }
         }
- fmt.Printf("⏭️ Adding access port: %s\n", port)
+         if BIGDEBUG {
+                fmt.Printf("⏭️ Adding access port: %s\n", port)
+         }
+
 		results = append(results, map[string]string{
 			"mac":  mac,
 			"port": port,
